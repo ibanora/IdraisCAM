@@ -17,3 +17,5 @@ jobs:
       - name: Verify Windows runner
         shell: pwsh
         run: Write-Host "IdraisCAM Windows build runner ready"
+
+# retrigger after repository was made public
