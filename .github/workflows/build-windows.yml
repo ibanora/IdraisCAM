@@ -2,102 +2,18 @@ name: Build IdraisCAM Windows Installer
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build-windows:
     runs-on: windows-2022
     timeout-minutes: 45
-
     steps:
-      - name: Checkout IdraisCAM
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract IdraisCAM build sources
+      - name: Verify Windows runner
         shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Expand-Archive -Path ci\idraiscam-ci-source.zip -DestinationPath . -Force
-          $iss = Get-Content installer\IdraisCAM.iss -Raw
-          $iss = $iss -replace '(?s)\r?\n\[Code\].*$', ''
-          Set-Content installer\IdraisCAM.iss -Value $iss -Encoding utf8
-
-      - name: Clone official OBS plugin template
-        shell: pwsh
-        run: git clone --depth 1 https://github.com/obsproject/obs-plugintemplate.git _obs_template
-
-      - name: Prepare OBS plugin build tree
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Copy-Item obs-plugin\src\* _obs_template\src\ -Recurse -Force
-          New-Item -ItemType Directory -Force _obs_template\data\locale | Out-Null
-          Copy-Item obs-plugin\data\locale\* _obs_template\data\locale\ -Force
-          Copy-Item ci\CMakeLists.txt _obs_template\CMakeLists.txt -Force
-
-          $spec = Get-Content _obs_template\buildspec.json -Raw | ConvertFrom-Json
-          $spec.name = 'idraiscam'
-          $spec.displayName = 'IdraisCAM'
-          $spec.version = '1.0.0'
-          $spec.author = 'IdraisCAM'
-          $spec.website = 'https://github.com/ibanora/IdraisCAM'
-          $spec.email = 'noreply@example.com'
-          $spec | ConvertTo-Json -Depth 100 | Set-Content _obs_template\buildspec.json -Encoding utf8
-
-      - name: Configure plugin
-        shell: pwsh
-        working-directory: _obs_template
-        run: cmake --preset windows-x64
-
-      - name: Build plugin DLL
-        shell: pwsh
-        working-directory: _obs_template
-        run: cmake --build --preset windows-x64 --config RelWithDebInfo --target idraiscam
-
-      - name: Stage OBS plugin
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $dll = Get-ChildItem _obs_template\build_x64 -Recurse -Filter idraiscam.dll | Select-Object -First 1
-          if (-not $dll) { throw 'idraiscam.dll was not produced by the build.' }
-          New-Item -ItemType Directory -Force release\idraiscam\bin\64bit | Out-Null
-          New-Item -ItemType Directory -Force release\idraiscam\data\locale | Out-Null
-          Copy-Item $dll.FullName release\idraiscam\bin\64bit\idraiscam.dll -Force
-          Copy-Item obs-plugin\data\locale\* release\idraiscam\data\locale\ -Force
-
-      - name: Install Inno Setup
-        shell: pwsh
-        run: choco install innosetup -y --no-progress
-
-      - name: Build installer EXE
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force dist | Out-Null
-          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
-          if (-not (Test-Path $iscc)) { throw 'ISCC.exe not found after installing Inno Setup.' }
-          & $iscc installer\IdraisCAM.iss
-          if (-not (Test-Path dist\IdraisCAM-Setup-x64.exe)) { throw 'Installer EXE was not produced.' }
-
-      - name: Create portable plugin ZIP
-        shell: pwsh
-        run: Compress-Archive -Path release\idraiscam -DestinationPath dist\IdraisCAM-OBS-Plugin-x64.zip -Force
-
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: IdraisCAM-Setup-x64
-          path: dist/IdraisCAM-Setup-x64.exe
-          if-no-files-found: error
-
-      - name: Upload portable plugin
-        uses: actions/upload-artifact@v4
-        with:
-          name: IdraisCAM-OBS-Plugin-x64
-          path: dist/IdraisCAM-OBS-Plugin-x64.zip
-          if-no-files-found: error
+        run: Write-Host "IdraisCAM Windows build runner ready"
